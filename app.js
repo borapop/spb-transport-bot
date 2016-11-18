@@ -1,34 +1,11 @@
 var TelegramBot = require('node-telegram-bot-api');
 var bot = new TelegramBot(process.env.TELEGRAM_OGRP_BOT_TOKEN, {polling: true});
+
+var view = require('./view');
 var Ogrp = require('ogrp');
 var ogrp = new Ogrp('./gtfs/', () => {
   console.log('GTFS data loaded');
 });
-
-function prepareForecastMessage(forecast) {
-  var message = '';
-  for (let i = 0; i < forecast.length; i++) {
-    var route = ogrp.getRouteById(forecast[i].routeId);
-    if (!route) continue;
-    var type;
-    if (route.transport_type == 'bus') type = '&#128652;';
-    else if (route.transport_type == 'trolley') type = '&#128654;';
-    else if (route.transport_type == 'tram') type = '&#128651;';
-    var timeLeft = new Date(Date.parse(forecast[i].arrivingTime) - Date.now() + (new Date()).getTimezoneOffset() * 60 * 1000);
-    if (!timeLeft) continue;
-    var timeLeftString = '';
-    if (timeLeft.getHours() > 0) {
-      timeLeftString += timeLeft.getHours() + ' ч '
-    }
-    if (timeLeft.getMinutes() > 0) {
-      timeLeftString += timeLeft.getMinutes() + ' мин';
-      message += type + ' <b>' + route.route_short_name  + '</b> через ' + timeLeftString + '\n';
-    } else {
-      message += type + ' <b>' + route.route_short_name  + '</b> сейчас ' + '\n';
-    }
-  }
-  return message;
-}
 
 bot.on('message', function(msg, match) {
   if (isNaN(msg.text)) {
@@ -36,7 +13,7 @@ bot.on('message', function(msg, match) {
   } else {
     ogrp.getForecastByStop(msg.text, (err, forecast) => {
       console.log(forecast);
-      var message = prepareForecastMessage(forecast.result);
+      var message = view.prepareForecastMessage(forecast.result);
       if (message) {
         bot.sendMessage(msg.from.id, message, {
           parse_mode: 'html'
@@ -46,19 +23,112 @@ bot.on('message', function(msg, match) {
   }
 });
 
-bot.on('location', function(msg, match){
-  console.log(msg);
-  var stop = ogrp.getStopByLocation(msg.location.latitude, msg.location.longitude);
-  if (stop) {
-    ogrp.getForecastByStop(stop.stop_id, (err, forecast) => {
-      console.log(err);
+bot.on('location', function(msg){
+  var lat = msg.location.latitude;
+  var lon = msg.location.longitude;
+  var stops = ogrp.getNearestStops(lat, lon);
+  if (stops) {
+    var sendMessage = function(message) {
+      bot.sendMessage(msg.from.id, message, {
+        parse_mode: 'html',
+        reply_markup: {
+          inline_keyboard : [
+            [{
+              text: view.nextStopButton,
+              callback_data: JSON.stringify({
+                count: 0,
+                lat: lat,
+                lon: lon
+              })
+            }]
+          ]
+        }
+      });
+    }
+    ogrp.getForecastByStop(stops[0].stop_id, (err, forecast) => {
       if (err) return;
-      console.log(forecast);
+      var message = view.prepareForecastMessage(ogrp, stops[0], forecast.result);
+      sendMessage(message);
     });
-  } else {
-    console.log('NOSTOP');
   }
+});
 
+bot.on('callback_query', function(msg) {
+  var data = JSON.parse(msg.data);
+  console.log(data.count);
+  if (data.count < 0) return;
+  var stops = ogrp.getNearestStops(data.lat, data.lon);
+  if (!stops[data.count]) return;
+  if ( (data.count > 0) && (data.count < stops.length - 1) ) {
+    var inline_keyboard = [[{
+        text: view.previosStopButton,
+        callback_data: JSON.stringify({
+          count: data.count - 1,
+          lat: data.lat,
+          lon: data.lon
+        })
+      }, {
+        text: view.nextStopButton,
+        callback_data: JSON.stringify({
+          count: data.count + 1,
+          lat: data.lat,
+          lon: data.lon
+        })
+      }]];
+  }
+  if (data.count == stops.length - 1) {
+    var inline_keyboard = [[{
+        text: view.previosStopButton,
+        callback_data: JSON.stringify({
+          count: data.count - 1,
+          lat: data.lat,
+          lon: data.lon
+        })
+      }]]
+  }
+  if (data.count == 0) {
+    var inline_keyboard = [[{
+        text: view.nextStopButton,
+        callback_data: JSON.stringify({
+          count: data.count + 1,
+          lat: data.lat,
+          lon: data.lon
+        })
+      }]];
+  }
+  if (inline_keyboard == undefined) return;
+  ogrp.getForecastByStop(stops[data.count].stop_id, (err, forecast) => {
+    if (err) return;
+    var message = view.prepareForecastMessage(ogrp, stops[data.count], forecast.result);
+    console.dir(msg);
+    if (msg.message) {
+      try {
+        bot.editMessageText(message ,{
+          chat_id: msg.from.id,
+          message_id: msg.message.message_id,
+          parse_mode: 'html',
+          reply_markup: {
+            inline_keyboard : inline_keyboard
+          }
+        });
+      } catch(e) {
+        console.log(e);
+      }
+    } else {
+      try {
+        bot.editMessageText(message ,{
+          inline_message_id: msg.inline_message_id,
+          parse_mode: 'html',
+          reply_markup: {
+            inline_keyboard : inline_keyboard
+          }
+        });
+      } catch(e) {
+        console.log(e);
+      }
+    }
+
+  });
 });
 
 function CollectArrayAsync(arrayLength, cb) {
@@ -72,28 +142,43 @@ function CollectArrayAsync(arrayLength, cb) {
 
 bot.on('inline_query', function(msg, match) {
   if (msg.location && !msg.query.length) {
-    var stops = ogrp.getNearestStops(msg.location.latitudeTELEGRAM_OGRP_BOT_TOKEN, msg.location.longitude);
+    var stops = ogrp.getNearestStops(msg.location.latitude, msg.location.longitude);
     if (stops) {
       if (stops.length > 50) {
         stops = stops.slice(-50);
       }
       var answerInlineQuery = function(inlineArray) {
-        bot.answerInlineQuery(msg.id, inlineArray);
+        bot.answerInlineQuery(msg.id, inlineArray, {
+          cache_time: 0
+        });
       }
       var collection = new CollectArrayAsync(stops.length, answerInlineQuery);
       for (let i = 0; (i < stops.length); i++) {
         ogrp.getForecastByStop(stops[i].stop_id, (err, forecast) => {
           if (err) return;
-          var message = prepareForecastMessage(forecast.result);
+          var message = view.prepareForecastMessage(ogrp, stops[i], forecast.result);
           if (message) {
             collection.push({
               id: stops[i].stop_id.toString(),
               type: 'article',
-              title: stops[i].stop_name.toString() + ' ' + stops[i].transport_type,
+              title: view.inlineStopTitle(stops[i].stop_name.toString(), stops[i].transport_type.toString()),
               input_message_content:  {
                 message_text: message,
                 parse_mode: 'html'
-              }
+              },
+              reply_markup: {
+                inline_keyboard : [
+                  [{
+                    text: view.nextStopButton,
+                    callback_data: JSON.stringify({
+                      count: 0,
+                      lat: msg.location.latitude,
+                      lon: msg.location.longitude
+                    })
+                  }]
+                ]
+              },
+              thumb_url: view.getMapThumbnailUrl(stops[i].stop_lat, stops[i].stop_lon, 18, 150, 150)
             });
           } else {
             collection.push({
@@ -101,7 +186,7 @@ bot.on('inline_query', function(msg, match) {
               type: 'article',
               title: stops[i].stop_name.toString(),
               input_message_content:  {
-                message_text: 'Прогноз недоступен',
+                message_text: view.forecastIsUnavailible,
                 parse_mode: 'html'
               }
             });
@@ -109,32 +194,9 @@ bot.on('inline_query', function(msg, match) {
         });
       }
     }
-  }/*
-  if (msg.query.length) {
-    var routes = ogrp.getRoutesByQuery(msg.query);
-    if (routes.length) {
-      var inlineResultArray = [];
-      for (let i = 0; (i < routes.length) && (i < 50); i++) {
-        ogrp.getForecastByStop(msg.text, (err, forecast) => {
-          if (err) return;
-          console.log(forecast);
-          var message = prepareForecastMessage(forecast.result);
-          if (message) {
-            inlineResultArray.push({
-              id: routes[i].route_id.toString(),
-              type: 'article',
-              title: routes[i].route_short_name.toString(),
-              input_message_content:  {
-                message_text: message,
-                parse_mode: 'html'
-              }
-            });
-          }
-        });
-
-      }
-      console.log(inlineResultArray);
-      bot.answerInlineQuery(msg.id, inlineResultArray);
-    }
-  }*/
+  } else if (msg.text) {
+    var routes = ogrp.getRoutesByQuery(msg.text);
+    if (!routes) return;
+    
+  }
 });
