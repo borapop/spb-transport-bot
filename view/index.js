@@ -2,13 +2,17 @@
 
 var view = {
   forecastIsUnavailible: 'Прогноз недоступен',
-  previosStopButton: '< Предыдущая остановка',
-  nextStopButton: 'Следующая остановка >',
+  previosStopButton: '< Туда',
+  nextStopButton: 'Сюда >',
+  moreStops: 'Другие остановки',
   getMapThumbnailUrl: function(lat, lon, zoom, sizeX, sizeY) {
     return 'https://static-maps.yandex.ru/1.x/?ll=' + lon + ',' + lat + '&z=' + zoom +
     '&size=' + sizeX + ',' + sizeY + '&l=map&pt=' + lon + ',' + lat + ',org';
   },
   getMapUrl: function(lat, lon, zoom) {
+
+  },
+  makeRouteMap: function(ogrp, res) {
 
   },
   inlineStopTitle: function(stopName, stopType) {

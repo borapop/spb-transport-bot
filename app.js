@@ -12,7 +12,7 @@ bot.on('message', function(msg, match) {
 
   } else {
     ogrp.getForecastByStop(msg.text, (err, forecast) => {
-      console.log(forecast);
+
       var message = view.prepareForecastMessage(forecast.result);
       if (message) {
         bot.sendMessage(msg.from.id, message, {
@@ -55,7 +55,6 @@ bot.on('location', function(msg){
 
 bot.on('callback_query', function(msg) {
   var data = JSON.parse(msg.data);
-  console.log(data.count);
   if (data.count < 0) return;
   var stops = ogrp.getNearestStops(data.lat, data.lon);
   if (!stops[data.count]) return;
@@ -100,20 +99,24 @@ bot.on('callback_query', function(msg) {
   ogrp.getForecastByStop(stops[data.count].stop_id, (err, forecast) => {
     if (err) return;
     var message = view.prepareForecastMessage(ogrp, stops[data.count], forecast.result);
-    console.dir(msg);
     if (msg.message) {
-      try {
-        bot.editMessageText(message ,{
-          chat_id: msg.from.id,
-          message_id: msg.message.message_id,
-          parse_mode: 'html',
-          reply_markup: {
-            inline_keyboard : inline_keyboard
-          }
-        });
-      } catch(e) {
-        console.log(e);
-      }
+      bot.editMessageText(message ,{
+        chat_id: msg.from.id,
+        message_id: msg.message.message_id,
+        parse_mode: 'html',
+        reply_markup: {
+          inline_keyboard : inline_keyboard
+        }
+      }).then(
+        result => {
+          console.log(reslut);
+        },
+        error => {
+          console.log(error);
+        }
+      ).catch(error => {
+        console.log(error);
+      });
     } else {
       try {
         bot.editMessageText(message ,{
@@ -127,7 +130,6 @@ bot.on('callback_query', function(msg) {
         console.log(e);
       }
     }
-
   });
 });
 
@@ -151,7 +153,7 @@ bot.on('inline_query', function(msg, match) {
         bot.answerInlineQuery(msg.id, inlineArray, {
           cache_time: 0
         });
-      }
+      };
       var collection = new CollectArrayAsync(stops.length, answerInlineQuery);
       for (let i = 0; (i < stops.length); i++) {
         ogrp.getForecastByStop(stops[i].stop_id, (err, forecast) => {
@@ -169,7 +171,7 @@ bot.on('inline_query', function(msg, match) {
               reply_markup: {
                 inline_keyboard : [
                   [{
-                    text: view.nextStopButton,
+                    text: view.moreStops,
                     callback_data: JSON.stringify({
                       count: 0,
                       lat: msg.location.latitude,
@@ -194,9 +196,7 @@ bot.on('inline_query', function(msg, match) {
         });
       }
     }
-  } else if (msg.text) {
-    var routes = ogrp.getRoutesByQuery(msg.text);
-    if (!routes) return;
-    
+  } else if (msg.query.length) {
+
   }
 });

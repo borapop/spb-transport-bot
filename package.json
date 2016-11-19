@@ -17,6 +17,6 @@
   },
   "homepage": "https://github.com/borapop/transport-bot#readme",
   "dependencies": {
-    "ogrp": "^1.0.6"
+    "ogrp": "^1.0.8"
   }
 }
