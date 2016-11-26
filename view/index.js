@@ -2,6 +2,7 @@
 
 var view = {
   forecastIsUnavailible: 'Прогноз недоступен',
+  noNearestStops: 'Остановок поблизости не найдено',
   previosStopButton: '< Туда',
   nextStopButton: 'Сюда >',
   moreStops: 'Другие остановки',

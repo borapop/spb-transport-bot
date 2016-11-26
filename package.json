@@ -1,7 +1,7 @@
 {
   "name": "transport-telegram-bot",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.1.0",
+  "description": "Telegram bot sending transport arrival forecast in Saint-Petersburg",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,12 +11,20 @@
     "url": "git+https://github.com/borapop/transport-bot.git"
   },
   "author": "borapop",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/borapop/transport-bot/issues"
   },
   "homepage": "https://github.com/borapop/transport-bot#readme",
   "dependencies": {
-    "ogrp": "^1.0.8"
-  }
+    "orgp": "^1.0.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "telegram",
+    "transport",
+    "spb",
+    "orgp",
+    "forecast"
+  ]
 }
